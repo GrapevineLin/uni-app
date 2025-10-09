@@ -25,6 +25,7 @@ const {
 const preprocessor = require('@dcloudio/vue-cli-plugin-uni/packages/webpack-preprocess-loader/preprocess')
 
 const traverse = require('./babel/scoped-component-traverse')
+const asyncTraverse = require('./babel/scoped-async-component-traverse')
 
 const {
   resolve,
@@ -82,10 +83,20 @@ module.exports = function (content, map) {
   if (!type) {
     type = 'Component'
   }
-
+  // ----------------------(新增)
+  // asyncCustomComponents 配置的content替换
+  if (content.includes('asyncCustomComponents')) {
+    const asyncTraverseObj = asyncTraverse(content, {
+      type,
+      components: []
+    })
+    content = asyncTraverseObj.content ? asyncTraverseObj.content : content
+  }
+  // ----------------------
   const {
     state: {
-      components
+      components,
+      asyncCustomComponents
     }
   } = traverse(parser.parse(content, getBabelParserOptions()), {
     type,
@@ -95,13 +106,13 @@ module.exports = function (content, map) {
 
   const callback = this.async()
 
-  if (!components.length) {
+  if (!components.length && !asyncCustomComponents) {
     if (type === 'App') {
       callback(null, content, map)
       return
     }
     // 防止组件从有到无，App.vue 中不支持使用组件
-    updateUsingComponents(resourcePath, Object.create(null), type, content)
+    updateUsingComponents(resourcePath, Object.create(null), type, content, asyncCustomComponents)
     callback(null, content, map)
     return
   }
@@ -148,7 +159,7 @@ module.exports = function (content, map) {
       }
       addDynamicImport(babelLoader, resourcePath, dynamicImports)
 
-      updateUsingComponents(resourcePath, usingComponents, type, content)
+      updateUsingComponents(resourcePath, usingComponents, type, content, asyncCustomComponents)
       callback(null, content, map)
     }
   }, err => {

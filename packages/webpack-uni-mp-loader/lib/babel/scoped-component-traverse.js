@@ -47,11 +47,34 @@ function handleObjectExpression (declaration, path, state) {
       t.isIdentifier(prop.key) &&
       prop.key.name === 'components'
   })[0]
+  // ----------------------(新增)
+  const asyncCustomComponentsProperty = declaration.properties.filter(prop => {
+    return t.isObjectProperty(prop) &&
+      t.isIdentifier(prop.key) &&
+      prop.key.name === 'asyncCustomComponents'
+  })[0]
+  if(asyncCustomComponentsProperty) {
+    handleAsyncCustomComponentsObjectExpression(asyncCustomComponentsProperty.value, path, state)
+  }
+  // ----------------------
 
   if (componentsProperty && t.isObjectExpression(componentsProperty.value)) {
     handleComponentsObjectExpression(componentsProperty.value, path, state)
   }
 }
+
+// ----------------------(新增)
+function handleAsyncCustomComponentsObjectExpression(componentsObjExpr, path, state) {
+  const properties = componentsObjExpr.properties
+  const asyncCustomComponentsDeclaration = properties.map(prop => {
+    return {
+      name: prop.key.name || prop.key.value,
+      value: prop.value.value
+    }
+  })
+  state.asyncCustomComponents = asyncCustomComponentsDeclaration
+}
+// ----------------------
 
 function handleComponentsObjectExpression (componentsObjExpr, path, state, prepend) {
   const properties = componentsObjExpr.properties
