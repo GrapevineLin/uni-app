@@ -151,7 +151,7 @@ module.exports = function generateJson (compilation) {
         return p
       }, {})
       const componentPlaceholder = jsonObj.asyncCustomComponents.reduce((p, n) => {
-        p[getComponentName(hyphenate(n.name))] = 'view'
+        p[getComponentName(hyphenate(n.name))] = n.placeholder || 'view'
         return p
       }, {})
       jsonObj.componentPlaceholder = Object.assign((jsonObj.componentPlaceholder || {}), componentPlaceholder)

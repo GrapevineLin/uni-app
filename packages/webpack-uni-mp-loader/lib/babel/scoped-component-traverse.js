@@ -53,7 +53,7 @@ function handleObjectExpression (declaration, path, state) {
       t.isIdentifier(prop.key) &&
       prop.key.name === 'asyncCustomComponents'
   })[0]
-  if(asyncCustomComponentsProperty) {
+  if (asyncCustomComponentsProperty) {
     handleAsyncCustomComponentsObjectExpression(asyncCustomComponentsProperty.value, path, state)
   }
   // ----------------------
@@ -64,14 +64,30 @@ function handleObjectExpression (declaration, path, state) {
 }
 
 // ----------------------(新增)
-function handleAsyncCustomComponentsObjectExpression(componentsObjExpr, path, state) {
+function handleAsyncCustomComponentsObjectExpression (componentsObjExpr, path, state) {
   const properties = componentsObjExpr.properties
   const asyncCustomComponentsDeclaration = properties.map(prop => {
-    return {
-      name: prop.key.name || prop.key.value,
-      value: prop.value.value
+    const name = prop.key.name || prop.key.value
+    const valueNode = prop.value
+    // backward compatible, eg: { 'uni-ec-canvas': '/pages/path' }
+    if (t.isStringLiteral(valueNode)) {
+      return {
+        name: name,
+        value: valueNode.value,
+        placeholder: 'view' // default
+      }
     }
-  })
+    // new format, eg: { 'uni-ec-canvas': { path: '/pages/path', componentPlaceholder: 'view' } }
+    if (t.isObjectExpression(valueNode)) {
+      const pathProp = valueNode.properties.find(p => (p.key.name || p.key.value) === 'path')
+      const placeholderProp = valueNode.properties.find(p => (p.key.name || p.key.value) === 'componentPlaceholder')
+      return {
+        name: name,
+        value: pathProp ? pathProp.value.value : '',
+        placeholder: placeholderProp ? placeholderProp.value.value : 'view'
+      }
+    }
+  }).filter(Boolean)
   state.asyncCustomComponents = asyncCustomComponentsDeclaration
 }
 // ----------------------

@@ -18,13 +18,28 @@ function handleObjectExpression (contentObj, path, state, ast) {
     const name = _.key.value.replace(/\-(\w)/g, function (all, letter) {
       return letter.toUpperCase()
     })
-    const value = _.value.value
-    const asyncCustomComponentsToImport = `import ${name} from '${'@' + value}';`
-    list += asyncCustomComponentsToImport
 
-    // 创建组件节点，使用 t.identifier 而不是 parser.parseExpression
-    const node = t.objectProperty(t.identifier(name), t.identifier(name))
-    componentNodes.push(node)
+    let componentPath
+    // Handle new format { path: '...', ... }
+    if (t.isObjectExpression(_.value)) {
+      const pathProp = _.value.properties.find(p => (p.key.name || p.key.value) === 'path')
+      if (pathProp && t.isStringLiteral(pathProp.value)) {
+        componentPath = pathProp.value.value
+      }
+    }
+    // Handle old format '...'
+    else if (t.isStringLiteral(_.value)) {
+      componentPath = _.value.value
+    }
+
+    if (componentPath) {
+      const asyncCustomComponentsToImport = `import ${name} from '${'@' + componentPath}';`
+      list += asyncCustomComponentsToImport
+
+      // 创建组件节点，使用 t.identifier 而不是 parser.parseExpression
+      const node = t.objectProperty(t.identifier(name), t.identifier(name), false, true)
+      componentNodes.push(node)
+    }
   })
 
   // 获取 ExportDefaultDeclaration 节点
