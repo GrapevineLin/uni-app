@@ -25,7 +25,6 @@ const {
 const preprocessor = require('@dcloudio/vue-cli-plugin-uni/packages/webpack-preprocess-loader/preprocess')
 
 const traverse = require('./babel/scoped-component-traverse')
-const asyncTraverse = require('./babel/scoped-async-component-traverse')
 
 const {
   resolve,
@@ -39,6 +38,53 @@ const {
 } = require('./babel/util')
 
 const uniI18n = require('@dcloudio/uni-cli-i18n')
+
+function parseQueryString (queryString) {
+  const params = new URLSearchParams(queryString)
+  return {
+    componentPlaceholder: params.get('componentPlaceholder') || 'view'
+  }
+}
+
+function convertCamelCaseToKebabCase (str) {
+  return str.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
+}
+
+function processAsyncComponentImports (content) {
+  const asyncCustomComponents = []
+
+  // 匹配 import 语句的正则表达式
+  const importRegex = /import\s+(\w+)\s+from\s+['"`]([^'"`]+\?[^'"`]*asyncComponent[^'"`]*)['"`]/g
+
+  let match
+  let processedContent = content
+
+  while ((match = importRegex.exec(content)) !== null) {
+    const [fullMatch, localName, importPath] = match
+    const [cleanPath, queryString] = importPath.split('?')
+
+    if (!queryString) continue
+
+    const { componentPlaceholder } = parseQueryString(queryString)
+
+    const componentTagName = convertCamelCaseToKebabCase(localName)
+
+    asyncCustomComponents.push({
+      name: componentTagName,
+      value: cleanPath,
+      placeholder: componentPlaceholder
+    })
+
+    // 替换 import 语句，移除查询参数
+    const newImportStatement = `import ${localName} from '@${cleanPath}'`
+    processedContent = processedContent.replace(fullMatch, newImportStatement)
+  }
+
+  return {
+    content: processedContent,
+    asyncCustomComponents
+  }
+}
 
 module.exports = function (content, map) {
   this.cacheable && this.cacheable()
@@ -83,30 +129,27 @@ module.exports = function (content, map) {
   if (!type) {
     type = 'Component'
   }
-  // ----------------------(新增)
-  // asyncCustomComponents 配置的content替换
-  if (content.includes('asyncCustomComponents')) {
-    const asyncTraverseObj = asyncTraverse(content, {
-      type,
-      components: []
-    })
-    content = asyncTraverseObj.content ? asyncTraverseObj.content : content
-  }
-  // ----------------------
+
+  // 处理异步组件导入（在 babel 转换之前）
+  const asyncComponentInfo = processAsyncComponentImports(content)
+  content = asyncComponentInfo.content
+
   const {
     state: {
-      components,
-      asyncCustomComponents
+      components
     }
   } = traverse(parser.parse(content, getBabelParserOptions()), {
     type,
     components: [],
+    asyncCustomComponents: asyncComponentInfo.asyncCustomComponents,
     filename: this.resourcePath
   })
 
+  const asyncCustomComponents = asyncComponentInfo.asyncCustomComponents
+
   const callback = this.async()
 
-  if (!components.length && !asyncCustomComponents) {
+  if (!components.length && !asyncCustomComponents.length) {
     if (type === 'App') {
       callback(null, content, map)
       return

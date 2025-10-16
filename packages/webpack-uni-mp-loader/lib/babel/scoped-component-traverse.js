@@ -47,50 +47,11 @@ function handleObjectExpression (declaration, path, state) {
       t.isIdentifier(prop.key) &&
       prop.key.name === 'components'
   })[0]
-  // ----------------------(新增)
-  const asyncCustomComponentsProperty = declaration.properties.filter(prop => {
-    return t.isObjectProperty(prop) &&
-      t.isIdentifier(prop.key) &&
-      prop.key.name === 'asyncCustomComponents'
-  })[0]
-  if (asyncCustomComponentsProperty) {
-    handleAsyncCustomComponentsObjectExpression(asyncCustomComponentsProperty.value, path, state)
-  }
-  // ----------------------
 
   if (componentsProperty && t.isObjectExpression(componentsProperty.value)) {
     handleComponentsObjectExpression(componentsProperty.value, path, state)
   }
 }
-
-// ----------------------(新增)
-function handleAsyncCustomComponentsObjectExpression (componentsObjExpr, path, state) {
-  const properties = componentsObjExpr.properties
-  const asyncCustomComponentsDeclaration = properties.map(prop => {
-    const name = prop.key.name || prop.key.value
-    const valueNode = prop.value
-    // backward compatible, eg: { 'uni-ec-canvas': '/pages/path' }
-    if (t.isStringLiteral(valueNode)) {
-      return {
-        name: name,
-        value: valueNode.value,
-        placeholder: 'view' // default
-      }
-    }
-    // new format, eg: { 'uni-ec-canvas': { path: '/pages/path', componentPlaceholder: 'view' } }
-    if (t.isObjectExpression(valueNode)) {
-      const pathProp = valueNode.properties.find(p => (p.key.name || p.key.value) === 'path')
-      const placeholderProp = valueNode.properties.find(p => (p.key.name || p.key.value) === 'componentPlaceholder')
-      return {
-        name: name,
-        value: pathProp ? pathProp.value.value : '',
-        placeholder: placeholderProp ? placeholderProp.value.value : 'view'
-      }
-    }
-  }).filter(Boolean)
-  state.asyncCustomComponents = asyncCustomComponentsDeclaration
-}
-// ----------------------
 
 function handleComponentsObjectExpression (componentsObjExpr, path, state, prepend) {
   const properties = componentsObjExpr.properties
